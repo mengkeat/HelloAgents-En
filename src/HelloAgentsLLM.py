@@ -88,33 +88,6 @@ class HelloAgentsLLM:
             print(f"❌ Error occurred when calling LLM API: {e}")
             return None
 
-    def think(self, messages: List[Dict[str, str]], temperature: float = 0) -> str:
-        """
-        Call the large language model to think and return its response.
-        """
-        print(f"🧠 Calling {self.model} model...")
-        try:
-            response = completion(
-                model=self.model,
-                messages=messages,
-                temperature=temperature,
-                stream=True,
-            )
-            
-            # Handle streaming response
-            print("✅ Large language model response successful:")
-            collected_content = []
-            for chunk in response:
-                content = chunk.choices[0].delta.content or ""
-                print(content, end="", flush=True)
-                collected_content.append(content)
-            print()  # Newline after streaming output ends
-            return "".join(collected_content)
-
-        except Exception as e:
-            print(f"❌ Error occurred when calling LLM API: {e}")
-            return None
-
 # --- Client Usage Example ---
 if __name__ == '__main__':
     try:
