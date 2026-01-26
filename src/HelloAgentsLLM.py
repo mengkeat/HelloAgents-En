@@ -10,6 +10,14 @@ from typing import List, Dict, Optional
 
 # Load environment variables from .env file
 load_dotenv()
+import logging
+
+# Disable verbose output
+litellm.set_verbose = False
+# Suppress specific debug info
+litellm.suppress_debug_info = True
+# Optionally set logging level to WARN or ERROR
+logging.getLogger("LiteLLM").setLevel(logging.ERROR)
 
 class HelloAgentsLLM:
     """
