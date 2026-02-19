@@ -13,11 +13,25 @@ load_dotenv()
 import logging
 
 # Disable verbose output
-litellm.set_verbose = False
+litellm.set_verbose = True
 # Suppress specific debug info
 litellm.suppress_debug_info = True
 # Optionally set logging level to WARN or ERROR
 logging.getLogger("LiteLLM").setLevel(logging.ERROR)
+
+# To enable UTF8 unicode to be redirectable via tee in windows terminal
+try:
+    if hasattr(sys, "stdout") and sys.stdout is not None:
+        enc = (sys.stdout.encoding or "").lower()
+        if "utf" not in enc:
+            try:
+                sys.stdout.reconfigure(encoding="utf-8")
+                sys.stderr.reconfigure(encoding="utf-8")
+            except Exception:
+                os.environ.setdefault("PYTHONUTF8", "1")
+                os.environ.setdefault("PYTHONIOENCODING", "utf-8")
+except Exception:
+    pass
 
 class HelloAgentsLLM:
     """
