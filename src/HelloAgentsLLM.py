@@ -1,9 +1,11 @@
 import os
 import sys
+import json
 import importlib
 import traceback
 import litellm
 from litellm import completion
+from litellm.integrations.custom_logger import CustomLogger
 from dotenv import load_dotenv
 
 from typing import List, Dict, Optional
@@ -12,12 +14,52 @@ from typing import List, Dict, Optional
 load_dotenv()
 import logging
 
-# Disable verbose output
-litellm.set_verbose = True
-# Suppress specific debug info
+litellm.set_verbose = False
 litellm.suppress_debug_info = True
-# Optionally set logging level to WARN or ERROR
-logging.getLogger("LiteLLM").setLevel(logging.ERROR)
+
+# --- JSON request/response file logger ---
+_LOG_FILE = os.path.join(os.path.dirname(__file__), "litellm_io.log")
+
+class _JsonFileLogger(CustomLogger):
+    """Logs the full JSON request and response for every LiteLLM call."""
+
+    def log_success_event(self, kwargs, response_obj, start_time, end_time):
+        self._write(kwargs, response_obj, start_time, end_time)
+
+    def log_failure_event(self, kwargs, response_obj, start_time, end_time):
+        self._write(kwargs, response_obj, start_time, end_time, error=True)
+
+    async def async_log_success_event(self, kwargs, response_obj, start_time, end_time):
+        self._write(kwargs, response_obj, start_time, end_time)
+
+    async def async_log_failure_event(self, kwargs, response_obj, start_time, end_time):
+        self._write(kwargs, response_obj, start_time, end_time, error=True)
+
+    def _write(self, kwargs, response_obj, start_time, end_time, error=False):
+        try:
+            entry = {
+                "timestamp": start_time.isoformat(),
+                "duration_s": round((end_time - start_time).total_seconds(), 3),
+                "error": error,
+                "request": {
+                    "model": kwargs.get("model"),
+                    "messages": kwargs.get("messages"),
+                    "optional_params": {
+                        k: v for k, v in kwargs.get("optional_params", {}).items()
+                        if k != "stream"
+                    },
+                },
+                "response": (
+                    response_obj.model_dump() if hasattr(response_obj, "model_dump")
+                    else str(response_obj)
+                ),
+            }
+            with open(_LOG_FILE, "a", encoding="utf-8") as f:
+                f.write(json.dumps(entry, ensure_ascii=False, default=str) + "\n")
+        except Exception:
+            pass
+
+litellm.callbacks = [_JsonFileLogger()]
 
 # To enable UTF8 unicode to be redirectable via tee in windows terminal
 try:
