@@ -1,5 +1,11 @@
 from typing import List, Dict, Any, Optional
 
+# Record type constants for Memory
+RECORD_EXECUTION = "execution"
+RECORD_REFLECTION = "reflection"
+NO_IMPROVEMENT_MARKER = "no improvement needed"
+
+
 class Memory:
     """
     A simple short-term memory module for storing the agent's action and reflection trajectory.
@@ -16,7 +22,7 @@ class Memory:
         Add a new record to memory.
 
         Parameters:
-        - record_type (str): Type of record ('execution' or 'reflection').
+        - record_type (str): Type of record (RECORD_EXECUTION or RECORD_REFLECTION).
         - content (str): Specific content of the record (e.g., generated code or reflection feedback).
         """
         record = {"type": record_type, "content": content}
@@ -29,9 +35,9 @@ class Memory:
         """
         trajectory_parts = []
         for record in self.records:
-            if record['type'] == 'execution':
+            if record['type'] == RECORD_EXECUTION:
                 trajectory_parts.append(f"--- Previous Attempt (Code) ---\n{record['content']}")
-            elif record['type'] == 'reflection':
+            elif record['type'] == RECORD_REFLECTION:
                 trajectory_parts.append(f"--- Reviewer Feedback ---\n{record['content']}")
 
         return "\n\n".join(trajectory_parts)
@@ -42,7 +48,7 @@ class Memory:
         Returns None if it doesn't exist.
         """
         for record in reversed(self.records):
-            if record['type'] == 'execution':
+            if record['type'] == RECORD_EXECUTION:
                 return record['content']
         return None
 
@@ -91,9 +97,6 @@ Your code must include a complete function signature, docstring, and follow PEP 
 Please output the optimized code directly without any additional explanations.
 """
 
-# Assume llm_client.py and memory.py are already defined
-# from llm_client import HelloAgentsLLM
-# from memory import Memory
 
 class ReflectionAgent:
     def __init__(self, llm_client, max_iterations=3):
@@ -107,8 +110,8 @@ class ReflectionAgent:
         # --- 1. Initial Execution ---
         print("\n--- Performing Initial Attempt ---")
         initial_prompt = INITIAL_PROMPT_TEMPLATE.format(task=task)
-        initial_code = self._get_llm_response(initial_prompt)
-        self.memory.add_record("execution", initial_code)
+        initial_code = self.llm_client.think_simple(initial_prompt) or ""
+        self.memory.add_record(RECORD_EXECUTION, initial_code)
 
         # --- 2. Iterative Loop: Reflection and Refinement ---
         for i in range(self.max_iterations):
@@ -118,11 +121,11 @@ class ReflectionAgent:
             print("\n-> Performing Reflection...")
             last_code = self.memory.get_last_execution()
             reflect_prompt = REFLECT_PROMPT_TEMPLATE.format(task=task, code=last_code)
-            feedback = self._get_llm_response(reflect_prompt)
-            self.memory.add_record("reflection", feedback)
+            feedback = self.llm_client.think_simple(reflect_prompt) or ""
+            self.memory.add_record(RECORD_REFLECTION, feedback)
 
             # b. Check if stopping is needed
-            if "no improvement needed" in feedback.lower():
+            if NO_IMPROVEMENT_MARKER in feedback.lower():
                 print("\n✅ Reflection considers code needs no improvement, task completed.")
                 break
 
@@ -133,23 +136,18 @@ class ReflectionAgent:
                 last_code_attempt=last_code,
                 feedback=feedback
             )
-            refined_code = self._get_llm_response(refine_prompt)
-            self.memory.add_record("execution", refined_code)
+            refined_code = self.llm_client.think_simple(refine_prompt) or ""
+            self.memory.add_record(RECORD_EXECUTION, refined_code)
 
         final_code = self.memory.get_last_execution()
         print(f"\n--- Task Completed ---\nFinal Generated Code:\n```python\n{final_code}\n```")
         return final_code
 
-    def _get_llm_response(self, prompt: str) -> str:
-        """A helper method for calling LLM and getting complete streaming response."""
-        messages = [{"role": "user", "content": prompt}]
-        response_text = self.llm_client.think(messages=messages) or ""
-        return response_text
 
 if __name__ == "__main__":
     from HelloAgentsLLM import HelloAgentsLLM
-    
-    llm_client = HelloAgentsLLM()  # Initialize your LLM client here
+
+    llm_client = HelloAgentsLLM()
     agent = ReflectionAgent(llm_client)
 
     example_task = "Write a Python function to find all prime numbers up to a given number n."

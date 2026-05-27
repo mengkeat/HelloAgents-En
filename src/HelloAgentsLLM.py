@@ -1,8 +1,6 @@
 import os
 import sys
 import json
-import importlib
-import traceback
 import litellm
 from litellm import completion
 from litellm.integrations.custom_logger import CustomLogger
@@ -12,7 +10,6 @@ from typing import List, Dict, Optional
 
 # Load environment variables from .env file
 load_dotenv()
-import logging
 
 litellm.set_verbose = False
 litellm.suppress_debug_info = True
@@ -80,33 +77,40 @@ class HelloAgentsLLM:
     A customized LLM client for the book "Hello Agents".
     It is used to call any service compatible with the OpenAI interface and uses streaming responses by default.
     """
-    def __init__(self, model: str = None, apiKey: str = None, baseUrl: str = None, timeout: int = None):
+    def __init__(self, model: str = None, api_key: str = None, base_url: str = None, timeout: int = None):
         """
         Initialize the client. Prioritize passed parameters; if not provided, load from environment variables.
         """
         self.model = model or os.getenv("LLM_MODEL_ID")
-        apiKey = apiKey or os.getenv("LLM_API_KEY")
-        baseUrl = baseUrl or os.getenv("LLM_BASE_URL")
+        api_key = api_key or os.getenv("LLM_API_KEY")
+        base_url = base_url or os.getenv("LLM_BASE_URL")
         timeout = timeout or int(os.getenv("LLM_TIMEOUT", 60))
 
         print(f"🔧 Initializing HelloAgentsLLM with model: {self.model}")
-        print(f"🔧 API Base URL: {baseUrl or 'Default (OpenAI)'}")
-        
+        print(f"🔧 API Base URL: {base_url or 'Default (OpenAI)'}")
+
         if not self.model:
             raise ValueError("Model ID must be provided or defined in the .env file.")
 
-        # If caller provided apiKey/baseUrl, expose them as common env vars so litellm picks them up.
+        # If caller provided api_key/base_url, expose them as common env vars so litellm picks them up.
         # This keeps behavior compatible with provider keys (OPENAI_API_KEY) and LiteLLM proxy usage.
-        if apiKey:
-            os.environ.setdefault("OPENAI_API_KEY", apiKey)
-            os.environ.setdefault("OPENROUTER_API_KEY", apiKey)
-            os.environ.setdefault("LITELLM_API_KEY", apiKey)
-        if baseUrl:
-            os.environ.setdefault("LITELLM_BASE_URL", baseUrl)
-            os.environ.setdefault("OPENAI_API_BASE", baseUrl)
+        if api_key:
+            os.environ.setdefault("OPENAI_API_KEY", api_key)
+            os.environ.setdefault("OPENROUTER_API_KEY", api_key)
+            os.environ.setdefault("LITELLM_API_KEY", api_key)
+        if base_url:
+            os.environ.setdefault("LITELLM_BASE_URL", base_url)
+            os.environ.setdefault("OPENAI_API_BASE", base_url)
 
         # No persistent client required for the common `completion()` helper; keep timeout for later uses
         self._timeout = timeout
+
+    def think_simple(self, prompt: str, temperature: float = 0) -> Optional[str]:
+        """
+        Convenience wrapper: call the LLM with a single user message.
+        Equivalent to think([{"role": "user", "content": prompt}]).
+        """
+        return self.think([{"role": "user", "content": prompt}], temperature=temperature)
 
     def think(self, messages: List[Dict[str, str]], temperature: float = 0) -> Optional[str]:
         """
@@ -126,21 +130,7 @@ class HelloAgentsLLM:
             print("✅ Large language model response successful:")
             collected_content = []
             for chunk in response:
-                # chunk may be a dict or an object with attributes depending on provider; handle both
-                content = ""
-                try:
-                    # dict-like
-                    content = (
-                        (chunk.get("choices", [{}])[0].get("delta", {}) or {}).get("content")
-                        or ""
-                    )
-                except Exception:
-                    try:
-                        # object-like
-                        content = getattr(chunk.choices[0].delta, "content", "") or ""
-                    except Exception:
-                        content = ""
-
+                content = self._extract_chunk_content(chunk)
                 if content:
                     print(content, end="", flush=True)
                     collected_content.append(content)
@@ -152,21 +142,32 @@ class HelloAgentsLLM:
             print(f"❌ Error occurred when calling LLM API: {e}")
             return None
 
+    @staticmethod
+    def _extract_chunk_content(chunk) -> str:
+        """Extract text content from a streaming response chunk (dict or object)."""
+        try:
+            return (
+                (chunk.get("choices", [{}])[0].get("delta", {}) or {}).get("content")
+                or ""
+            )
+        except AttributeError:
+            try:
+                return getattr(chunk.choices[0].delta, "content", "") or ""
+            except (AttributeError, IndexError):
+                return ""
+
 # --- Client Usage Example ---
 if __name__ == '__main__':
     try:
-        llmClient = HelloAgentsLLM()
-        
-        exampleMessages = [
-            {"role": "system", "content": "You are a helpful assistant that writes Python code."},
-            {"role": "user", "content": "Write a quicksort algorithm"}
-        ]
-        
+        llm_client = HelloAgentsLLM()
+
+        example_prompt = "Write a quicksort algorithm in Python."
+
         print("--- Calling LLM ---")
-        responseText = llmClient.think(exampleMessages)
-        if responseText:
+        response_text = llm_client.think_simple(example_prompt)
+        if response_text:
             print("\n\n--- Complete Model Response ---")
-            print(responseText)
+            print(response_text)
 
     except ValueError as e:
         print(e)

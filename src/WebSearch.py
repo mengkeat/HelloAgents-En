@@ -3,6 +3,10 @@ from serpapi import GoogleSearch
 from ddgs import DDGS
 from dotenv import load_dotenv
 
+load_dotenv()
+
+_SERPAPI_API_KEY = os.getenv("SERPAPI_API_KEY")
+
 def serp_search(query: str) -> str:
     """
     A practical web search engine tool based on SerpApi.
@@ -10,20 +14,17 @@ def serp_search(query: str) -> str:
     """
     print(f"Executing [SerpApi] web search: {query}")
     try:
-        load_dotenv()
-        api_key = os.getenv("SERPAPI_API_KEY")
-
-        if not api_key:
+        if not _SERPAPI_API_KEY:
             return "Error: SERPAPI_API_KEY not configured in .env file."
 
         params = {
             "q": query,
-            "api_key": api_key,
+            "api_key": _SERPAPI_API_KEY,
             "google_domain": "google.com",
             "gl": "sg",  # Country code
             "hl": "en", # Language code
         }
-        
+
         client = GoogleSearch(params)
         results = client.get_dict()
         

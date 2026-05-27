@@ -34,15 +34,17 @@ class ReActAgent:
         """
         Run the ReAct agent to answer a question.
         """
-        self.history = [] # Reset history for each run
+        self.history = []  # Reset history for each run
         current_step = 0
+
+        # Compute tool descriptions once (they don't change between steps)
+        tools_desc = self.tool_executor.getAvailableTools()
 
         while current_step < self.max_steps:
             current_step += 1
             print(f"--- Step {current_step} ---")
 
             # 1. Format prompt
-            tools_desc = self.tool_executor.getAvailableTools()
             history_str = "\n".join(self.history)
             prompt = REACT_PROMPT_TEMPLATE.format(
                 tools=tools_desc,
@@ -51,8 +53,7 @@ class ReActAgent:
             )
 
             # 2. Call LLM to think
-            messages = [{"role": "user", "content": prompt}]
-            response_text = self.llm_client.think(messages=messages)
+            response_text = self.llm_client.think_simple(prompt)
 
             if not response_text:
                 print("Error: LLM failed to return a valid response.")
@@ -117,15 +118,15 @@ if __name__ == '__main__':
     import WebSearch
 
     # Initialize LLM client
-    llmClient = HelloAgentsLLM()
+    llm_client = HelloAgentsLLM()
 
     # Initialize tool executor and register tools
-    toolExecutor = ToolExecutor()
+    tool_executor = ToolExecutor()
     search_description = "A web search engine. Use this tool when you need to answer questions about current events, facts, and information not found in your knowledge base."
-    toolExecutor.registerTool("Search", search_description, WebSearch.ddgs_search)
+    tool_executor.registerTool("Search", search_description, WebSearch.ddgs_search)
 
     # Initialize ReAct agent
-    react_agent = ReActAgent(llm_client=llmClient, tool_executor=toolExecutor, max_steps=5)
+    react_agent = ReActAgent(llm_client=llm_client, tool_executor=tool_executor, max_steps=5)
 
     # Run the agent with a sample question
     question = "What is the latest news about space exploration?"

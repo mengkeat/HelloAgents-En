@@ -36,22 +36,22 @@ if __name__ == '__main__':
     import WebSearch
 
     # 1. Initialize tool executor
-    toolExecutor = ToolExecutor()
+    tool_executor = ToolExecutor()
 
     # 2. Register our practical search tool
     search_description = "A web search engine. Use this tool when you need to answer questions about current events, facts, and information not found in your knowledge base."
-    toolExecutor.registerTool("Search", search_description, WebSearch.ddgs_search)
+    tool_executor.registerTool("Search", search_description, WebSearch.ddgs_search)
 
     # 3. Print available tools
     print("\n--- Available Tools ---")
-    print(toolExecutor.getAvailableTools())
+    print(tool_executor.getAvailableTools())
 
     # 4. Agent's Action call, this time we ask a real-time question
     print("\n--- Execute Action: Search['What is NVIDIA's latest GPU model'] ---")
     tool_name = "Search"
     tool_input = "What is NVIDIA's latest GPU model"
 
-    tool_function = toolExecutor.getTool(tool_name)
+    tool_function = tool_executor.getTool(tool_name)
     if tool_function:
         observation = tool_function(tool_input)
         print("--- Observation ---")

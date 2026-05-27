@@ -1,4 +1,3 @@
-# Assume the HelloAgentsLLM class in llm_client.py is already defined
 import ast
 from HelloAgentsLLM import HelloAgentsLLM
 
@@ -25,12 +24,8 @@ class Planner:
         """
         prompt = PLANNER_PROMPT_TEMPLATE.format(question=question)
 
-        # To generate a plan, we build a simple message list
-        messages = [{"role": "user", "content": prompt}]
-
         print("--- Generating Plan ---")
-        # Use streaming output to get the complete plan
-        response_text = self.llm_client.think(messages=messages) or ""
+        response_text = self.llm_client.think_simple(prompt) or ""
 
         print(f"✅ Plan Generated:\n{response_text}")
 
@@ -44,9 +39,6 @@ class Planner:
         except (ValueError, SyntaxError, IndexError) as e:
             print(f"❌ Error parsing plan: {e}")
             print(f"Raw response: {response_text}")
-            return []
-        except Exception as e:
-            print(f"❌ Unknown error occurred while parsing plan: {e}")
             return []
 
 EXECUTOR_PROMPT_TEMPLATE = """
@@ -91,9 +83,7 @@ class Executor:
                 current_step=step
             )
 
-            messages = [{"role": "user", "content": prompt}]
-
-            response_text = self.llm_client.think(messages=messages) or ""
+            response_text = self.llm_client.think_simple(prompt) or ""
 
             # Update history for the next step
             history += f"Step {i+1}: {step}\nResult: {response_text}\n\n"
