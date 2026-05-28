@@ -58,6 +58,12 @@ class _JsonFileLogger(CustomLogger):
 
 litellm.callbacks = [_JsonFileLogger()]
 
+DEFAULT_MODEL_ID = "deepseek/deepseek-v4-pro"
+PROVIDER_API_KEY_ENV_VARS = {
+    "deepseek/": "DEEPSEEK_API_KEY",
+    "openrouter/": "OPENROUTER_API_KEY",
+}
+
 # To enable UTF8 unicode to be redirectable via tee in windows terminal
 try:
     if hasattr(sys, "stdout") and sys.stdout is not None:
@@ -81,29 +87,44 @@ class HelloAgentsLLM:
         """
         Initialize the client. Prioritize passed parameters; if not provided, load from environment variables.
         """
-        self.model = model or os.getenv("LLM_MODEL_ID")
-        api_key = api_key or os.getenv("LLM_API_KEY")
+        self.model = model or os.getenv("LLM_MODEL_ID") or os.getenv("MODEL_ID") or DEFAULT_MODEL_ID
+        provider_api_key_env_var = self._provider_api_key_env_var(self.model)
+        provider_api_key = os.getenv(provider_api_key_env_var) if provider_api_key_env_var else None
+        explicit_api_key = api_key
+        selected_api_key = explicit_api_key or provider_api_key or os.getenv("LLM_API_KEY")
         base_url = base_url or os.getenv("LLM_BASE_URL")
         timeout = timeout or int(os.getenv("LLM_TIMEOUT", 60))
 
         print(f"🔧 Initializing HelloAgentsLLM with model: {self.model}")
-        print(f"🔧 API Base URL: {base_url or 'Default (OpenAI)'}")
+        print(f"🔧 API Base URL: {base_url or 'Provider default'}")
 
         if not self.model:
             raise ValueError("Model ID must be provided or defined in the .env file.")
 
-        # If caller provided api_key/base_url, expose them as common env vars so litellm picks them up.
-        # This keeps behavior compatible with provider keys (OPENAI_API_KEY) and LiteLLM proxy usage.
-        if api_key:
-            os.environ.setdefault("OPENAI_API_KEY", api_key)
-            os.environ.setdefault("OPENROUTER_API_KEY", api_key)
-            os.environ.setdefault("LITELLM_API_KEY", api_key)
+        # Expose the selected key under the provider-specific env var LiteLLM expects
+        # (for DeepSeek this is DEEPSEEK_API_KEY), while keeping generic fallbacks.
+        if selected_api_key:
+            if provider_api_key_env_var:
+                if explicit_api_key or not os.getenv(provider_api_key_env_var):
+                    os.environ[provider_api_key_env_var] = selected_api_key
+            else:
+                os.environ.setdefault("OPENAI_API_KEY", selected_api_key)
+            os.environ.setdefault("LITELLM_API_KEY", selected_api_key)
         if base_url:
             os.environ.setdefault("LITELLM_BASE_URL", base_url)
             os.environ.setdefault("OPENAI_API_BASE", base_url)
 
         # No persistent client required for the common `completion()` helper; keep timeout for later uses
         self._timeout = timeout
+
+    @staticmethod
+    def _provider_api_key_env_var(model: str) -> Optional[str]:
+        """Return the LiteLLM provider-specific API key env var for known model prefixes."""
+        normalized_model = (model or "").lower()
+        for prefix, env_var in PROVIDER_API_KEY_ENV_VARS.items():
+            if normalized_model.startswith(prefix):
+                return env_var
+        return None
 
     def think_simple(self, prompt: str, temperature: float = 0) -> Optional[str]:
         """

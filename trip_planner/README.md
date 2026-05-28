@@ -11,9 +11,9 @@ This version is intentionally Python-only and uses this repository's existing
 Create a `.env` file in the repository root if you want live LLM and map data:
 
 ```env
-LLM_MODEL_ID=your-model-id
-LLM_API_KEY=your-api-key
-LLM_BASE_URL=your-api-base-url   # optional for OpenAI-compatible providers
+LLM_MODEL_ID=deepseek/deepseek-v4-pro
+DEEPSEEK_API_KEY=your-deepseek-api-key
+# LLM_BASE_URL is optional for OpenAI-compatible providers or LiteLLM proxy usage
 LLM_TIMEOUT=60
 
 AMAP_API_KEY=your-amap-web-service-key
